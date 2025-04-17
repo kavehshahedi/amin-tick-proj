@@ -1,0 +1,8 @@
+/data/
+/.streamlit/
+
+/.vscode/
+
+/.mypy_cache/
+
+/venv/

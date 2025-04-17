@@ -10,6 +10,8 @@ import logging
 import shelve
 import os
 from pathlib import Path
+import requests
+import time
 
 import ollama
 import streamlit as st
@@ -128,7 +130,40 @@ class LlmService:
         if ollama_api_host:
             os.environ["OLLAMA_HOST"] = ollama_api_host
             logger.info(f"Using custom Ollama API host: {ollama_api_host}")
-    
+
+    # Add this code to utils/chat.py in the LlmService class
+
+    def wait_for_ollama(self, max_retries=10, retry_interval=5):
+        """
+        Wait for Ollama service to be available.
+        
+        Args:
+            max_retries: Maximum number of connection attempts
+            retry_interval: Seconds to wait between retries
+            
+        Returns:
+            bool: True if Ollama is available, False otherwise
+        """
+        ollama_url = os.environ.get("OLLAMA_API_HOST", "http://localhost:11434")
+        health_url = f"{ollama_url}/api/version"
+        
+        logger.info(f"Checking Ollama availability at {health_url}")
+        
+        for attempt in range(max_retries):
+            try:
+                response = requests.get(health_url, timeout=5)
+                if response.status_code == 200:
+                    logger.info(f"Ollama is available: {response.json()}")
+                    return True
+            except Exception as e:
+                logger.warning(f"Attempt {attempt+1}/{max_retries}: Ollama not available yet. Error: {e}")
+            
+            logger.info(f"Waiting {retry_interval} seconds before next attempt...")
+            time.sleep(retry_interval)
+        
+        logger.error(f"Failed to connect to Ollama after {max_retries} attempts")
+        return False
+
     def generate_response(self, messages: List[Dict[str, Any]]) -> Iterator[str]:
         """
         Generate streaming response from the LLM.
@@ -139,6 +174,11 @@ class LlmService:
         Yields:
             Tokens from the LLM response as they become available
         """
+        # Try to ensure Ollama is available
+        if not self.wait_for_ollama():
+            yield "I'm having trouble connecting to the language model service. Please try again in a few moments."
+            return
+        
         try:
             logger.info(f"Generating response with model={self.model}, temp={self.temperature}")
             

@@ -1,35 +1,32 @@
-version: '3.8'
-
+# docker-compose.prod.yml
 services:
   ticketassist:
     build: .
     container_name: ticketassist
     restart: always
     ports:
-    - "8501:8501"
+      - "8501:8501"
     volumes:
-    - ./data:/app/data
-    - ./.streamlit:/app/.streamlit
+      - ./src/components/GUI-Frontend/data:/app/data
+      - ./src/components/GUI-Frontend/.streamlit:/app/.streamlit
     environment:
-    - OLLAMA_API_HOST=http://ollama:11434
-    - PYTHONUNBUFFERED=1
-    # LLM Parameters 
-    - LLM_MODEL=${LLM_MODEL:-llama3.1:8b}
-    - LLM_TEMPERATURE=${LLM_TEMPERATURE:-0.1}
-    - LLM_MAX_TOKENS=${LLM_MAX_TOKENS:-512}
-    # App Settings
-    - APP_TITLE=${APP_TITLE:-TicketAssist}
-    - DEBUG_MODE=${DEBUG_MODE:-false}
+      - OLLAMA_API_HOST=http://ollama:11434
+      - PYTHONUNBUFFERED=1
+      - LLM_MODEL=${LLM_MODEL:-llama3.1:8b}
+      - LLM_TEMPERATURE=${LLM_TEMPERATURE:-0.1}
+      - LLM_MAX_TOKENS=${LLM_MAX_TOKENS:-512}
+      - APP_TITLE=${APP_TITLE:-TicketAssist}
+      - DEBUG_MODE=${DEBUG_MODE:-false}
     secrets:
-    - replicate_api_token
-    - streamlit_auth_user
-    - streamlit_auth_password
+      - replicate_api_token
+      - streamlit_auth_user
+      - streamlit_auth_password
     depends_on:
-    - ollama
+      - ollama
     networks:
-    - ticketassist-network
+      - ticketassist-network
     healthcheck:
-      test: [ "CMD", "curl", "--fail", "http://localhost:8501/_stcore/health" ]
+      test: ["CMD", "curl", "--fail", "http://localhost:8501/_stcore/health"]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -40,18 +37,12 @@ services:
     container_name: ollama
     restart: always
     ports:
-    - "11434:11434"
+      - "11434:11434"
     volumes:
-    - ollama-data:/root/.ollama
+      - ollama-data:/root/.ollama
     networks:
-    - ticketassist-network
-    deploy:
-      resources:
-        reservations:
-          devices:
-          - driver: nvidia
-            count: all
-            capabilities: [ gpu ]
+      - ticketassist-network
+    # CPU-only configuration
 
 networks:
   ticketassist-network:
@@ -63,8 +54,8 @@ volumes:
 
 secrets:
   replicate_api_token:
-    file: ./secrets/replicate_api_token.txt
+    file: ./src/components/GUI-Frontend/secrets/replicate_api_token.txt
   streamlit_auth_user:
-    file: ./secrets/streamlit_auth_user.txt
+    file: ./src/components/GUI-Frontend/secrets/streamlit_auth_user.txt
   streamlit_auth_password:
-    file: ./secrets/streamlit_auth_password.txt
+    file: ./src/components/GUI-Frontend/secrets/streamlit_auth_password.txt

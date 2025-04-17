@@ -1,0 +1,70 @@
+version: '3.8'
+
+services:
+  ticketassist:
+    build: .
+    container_name: ticketassist
+    restart: always
+    ports:
+    - "8501:8501"
+    volumes:
+    - ./data:/app/data
+    - ./.streamlit:/app/.streamlit
+    environment:
+    - OLLAMA_API_HOST=http://ollama:11434
+    - PYTHONUNBUFFERED=1
+    # LLM Parameters 
+    - LLM_MODEL=${LLM_MODEL:-llama3.1:8b}
+    - LLM_TEMPERATURE=${LLM_TEMPERATURE:-0.1}
+    - LLM_MAX_TOKENS=${LLM_MAX_TOKENS:-512}
+    # App Settings
+    - APP_TITLE=${APP_TITLE:-TicketAssist}
+    - DEBUG_MODE=${DEBUG_MODE:-false}
+    secrets:
+    - replicate_api_token
+    - streamlit_auth_user
+    - streamlit_auth_password
+    depends_on:
+    - ollama
+    networks:
+    - ticketassist-network
+    healthcheck:
+      test: [ "CMD", "curl", "--fail", "http://localhost:8501/_stcore/health" ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    restart: always
+    ports:
+    - "11434:11434"
+    volumes:
+    - ollama-data:/root/.ollama
+    networks:
+    - ticketassist-network
+    deploy:
+      resources:
+        reservations:
+          devices:
+          - driver: nvidia
+            count: all
+            capabilities: [ gpu ]
+
+networks:
+  ticketassist-network:
+    driver: bridge
+
+volumes:
+  ollama-data:
+    driver: local
+
+secrets:
+  replicate_api_token:
+    file: ./secrets/replicate_api_token.txt
+  streamlit_auth_user:
+    file: ./secrets/streamlit_auth_user.txt
+  streamlit_auth_password:
+    file: ./secrets/streamlit_auth_password.txt

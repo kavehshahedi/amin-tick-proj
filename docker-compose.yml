@@ -1,0 +1,57 @@
+# docker-compose.yml (without GPU requirements)
+services:
+  ticketassist:
+    build: .
+    container_name: ticketassist
+    restart: always
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./data:/app/data
+      - ./.streamlit:/app/.streamlit
+    env_file:
+      - .env
+    environment:
+      - OLLAMA_API_HOST=http://ollama:11434
+      - PYTHONUNBUFFERED=1
+      # API Keys and Authentication
+      - REPLICATE_API_TOKEN=${REPLICATE_API_TOKEN:-}
+      - STREAMLIT_AUTH_USER=${STREAMLIT_AUTH_USER:-admin}
+      - STREAMLIT_AUTH_PASSWORD=${STREAMLIT_AUTH_PASSWORD:-admin}
+      # LLM Parameters 
+      - LLM_MODEL=${LLM_MODEL:-llama3.1:8b}
+      - LLM_TEMPERATURE=${LLM_TEMPERATURE:-0.1}
+      - LLM_MAX_TOKENS=${LLM_MAX_TOKENS:-512}
+      # App Settings
+      - APP_TITLE=${APP_TITLE:-TicketAssist}
+      - DEBUG_MODE=${DEBUG_MODE:-false}
+    depends_on:
+      - ollama
+    networks:
+      - ticketassist-network
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8501/_stcore/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    restart: always
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    networks:
+      - ticketassist-network
+    # GPU configuration removed
+
+networks:
+  ticketassist-network:
+    driver: bridge
+
+volumes:
+  ollama-data:
+    driver: local

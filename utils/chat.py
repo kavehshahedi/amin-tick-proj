@@ -8,10 +8,13 @@ from datetime import datetime
 import json
 import logging
 import shelve
+import os
 from pathlib import Path
 
 import ollama
 import streamlit as st
+
+from utils.config import config
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -108,14 +111,23 @@ class LlmService:
     Handles communication with Ollama and other LLM providers.
     """
     
-    def __init__(self, model: str = "llama3.1:8b") -> None:
+    def __init__(self, model: Optional[str] = None) -> None:
         """
         Initialize the LLM service.
         
         Args:
-            model: Name of the model to use
+            model: Name of the model to use, defaults to the configured model
         """
-        self.model = model
+        self.model = model or config.get("LLM_MODEL", "llama3.1:8b")
+        self.temperature = config.get("LLM_TEMPERATURE", 0.1)
+        self.max_tokens = config.get("LLM_MAX_TOKENS", 512)
+        self.top_p = config.get("LLM_TOP_P", 0.9)
+        
+        # Configure Ollama API host if specified
+        ollama_api_host = config.get("OLLAMA_API_HOST")
+        if ollama_api_host:
+            os.environ["OLLAMA_HOST"] = ollama_api_host
+            logger.info(f"Using custom Ollama API host: {ollama_api_host}")
     
     def generate_response(self, messages: List[Dict[str, Any]]) -> Iterator[str]:
         """
@@ -128,10 +140,17 @@ class LlmService:
             Tokens from the LLM response as they become available
         """
         try:
+            logger.info(f"Generating response with model={self.model}, temp={self.temperature}")
+            
             response = ollama.chat(
                 model=self.model, 
                 stream=True, 
-                messages=messages
+                messages=messages,
+                options={
+                    "temperature": self.temperature,
+                    "top_p": self.top_p,
+                    "num_predict": self.max_tokens
+                }
             )
             
             for partial_resp in response:

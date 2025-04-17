@@ -12,6 +12,7 @@ from streamlit_feedback import streamlit_feedback
 
 # Import custom utilities
 from utils.chat import ChatHistory, LlmService
+from utils.config import config
 
 
 class ChatbotUI:
@@ -64,55 +65,75 @@ class ChatbotUI:
             st.title('TicketAssist Chatbot')
             
             # API token configuration
-            if 'REPLICATE_API_TOKEN' in st.secrets:
-                st.success('Connected to ELI API', icon='✅')
-                replicate_api = st.secrets['REPLICATE_API_TOKEN']
+            replicate_api = config.get("REPLICATE_API_TOKEN", "")
+            
+            if replicate_api:
+                st.success('Connected to API', icon='✅')
             else:
                 replicate_api = st.text_input('Enter Replicate API token:', type='password')
-                if not (replicate_api.startswith('r8_') and len(replicate_api) == 40):
-                    st.warning('Please enter your credentials!', icon='⚠️')
-                else:
-                    st.success('Proceed to entering your prompt message!', icon='👉')
+                if replicate_api:
+                    if not (replicate_api.startswith('r8_') and len(replicate_api) == 40):
+                        st.warning('Please enter your credentials!', icon='⚠️')
+                    else:
+                        st.success('Proceed to entering your prompt message!', icon='👉')
+                        # Store temporarily in session state
+                        st.session_state.replicate_api = replicate_api
             
             # Model selection
-            st.subheader('Models and parameters')
+            st.subheader('Models and Parameters')
+            
+            # Fetch model options and default model dynamically from config or fallback to defaults
+            model_options = config.get("LLM_MODEL_OPTIONS", ['Llama3-8B', 'Llama2-13B', 'Llama3.2-3B'])
+            model_mapping = config.get("LLM_MODEL_MAPPING", {
+                'Llama3-8B': 'llama3.1:8b',
+                'Llama2-13B': 'llama2.1:13b',
+                'Llama3.2-3B': 'llama3.2'
+            })
+            default_model_key = config.get("LLM_DEFAULT_MODEL", 'Llama3-8B')
+            
+            # Ensure default model exists in options
+            if default_model_key not in model_options:
+                default_model_key = model_options[0]
+            
+            # Display model selection dropdown
             selected_model = st.sidebar.selectbox(
                 'Choose a model', 
-                ['Llama3-8B', 'Llama2-13B'], 
+                model_options, 
+                index=model_options.index(default_model_key),
                 key='selected_model'
             )
             
-            # Initialize model with a default value
-            model = 'llama3.1:8b'
+            # Map selected model to its corresponding identifier
+            model = model_mapping.get(selected_model, model_mapping[default_model_key])
+            self.llm_service.model = model
             
-            if selected_model == 'Llama3-8B':
-                model = 'llama3.1:8b'
-                self.llm_service.model = model
-            
-            # Model parameters
+            # Model parameters - initialized from config but can be adjusted in UI
             temperature = st.sidebar.slider(
                 'temperature', 
                 min_value=0.01, 
                 max_value=5.0, 
-                value=0.1, 
+                value=float(config.get("LLM_TEMPERATURE", 0.1)),
                 step=0.01
             )
+            self.llm_service.temperature = temperature
             
             top_p = st.sidebar.slider(
                 'top_p', 
                 min_value=0.01, 
                 max_value=1.0, 
-                value=0.9, 
+                value=float(config.get("LLM_TOP_P", 0.9)),
                 step=0.01
             )
+            self.llm_service.top_p = top_p
             
             max_length = st.sidebar.slider(
                 'max_length', 
                 min_value=64, 
                 max_value=4096, 
-                value=512, 
+                value=int(config.get("LLM_MAX_TOKENS", 512)),
                 step=8
             )
+            self.llm_service.max_tokens = max_length
             
             seed = st.number_input(
                 'Seed', 
@@ -164,7 +185,7 @@ class ChatbotUI:
                 
                 # Stream the response
                 st.chat_message("assistant", avatar=self.BOT_AVATAR).write_stream(
-                    self.llm_service.generate_response
+                    self.llm_service.generate_response(st.session_state.messages)
                 )
                 
                 # Add complete response to history

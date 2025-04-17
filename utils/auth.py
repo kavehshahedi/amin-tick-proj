@@ -7,6 +7,8 @@ for the TicketAssist application.
 from typing import Callable, Dict, Optional, Tuple, Any
 import streamlit as st
 
+from utils.config import config
+
 
 class Authenticator:
     """
@@ -26,10 +28,14 @@ class Authenticator:
         Verify provided credentials and update authentication state.
         
         This method checks if the provided username and password match 
-        predefined credentials and updates the session state accordingly.
+        configured credentials and updates the session state accordingly.
         """
-        if (st.session_state["user"].strip() == "admin" and 
-            st.session_state["passwd"].strip() == "admin"):
+        # Get configured credentials from environment or Docker secrets
+        valid_username = config.get("STREAMLIT_AUTH_USER", "admin")
+        valid_password = config.get("STREAMLIT_AUTH_PASSWORD", "admin")
+        
+        if (st.session_state["user"].strip() == valid_username and 
+            st.session_state["passwd"].strip() == valid_password):
             st.session_state["authenticated"] = True
         else:
             st.session_state["authenticated"] = False
